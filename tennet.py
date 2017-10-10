@@ -37,8 +37,7 @@ if __name__ == '__main__':
     scheduler.add_job(run, 'cron', hour='8', day_of_week='mon,tue,wed,thu,fri',
                       max_instances=1, misfire_grace_time=None)
     try:
-        run()
-        # scheduler.start()
+        scheduler.start()
     except KeyboardInterrupt:
         print("Stopped by keyboard interrupt")
         raise KeyboardInterrupt
