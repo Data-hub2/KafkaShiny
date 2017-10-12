@@ -1,7 +1,7 @@
-from logging.handlers import SocketHandler
 import ssl
 import logging
 import json
+from logging.handlers import SocketHandler
 
 
 class LogstashHandler(SocketHandler):

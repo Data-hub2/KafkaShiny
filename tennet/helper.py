@@ -1,24 +1,30 @@
-import settings
-import logging
-import json
 import hashlib
+import json
+import logging
 import pandas as pd
 from datetime import datetime, timedelta
 from pykafka import KafkaClient
+from tennet import settings
 
 
-def parse_tennet_url(date_range):
+def create_tennet_url(date_range):
+    logging.info("tennet: Started creating the URL to get data from")
+    base_url = settings.BASE_URL + settings.TYPE + date_range + settings.SUBMIT_TYPE
+    return base_url
+
+
+def parse_tennet_url(base_url):
     """
     Parse the tennet imbalance Endpoint to get the data
-    :param date_range: The date range to the data for
-    :type date_range: string
+    :param base_url: The URL from which to get the data
+    :type base_url: string
     :return: The Dataframe for the extracted data
     :rtype: Dataframe Object
     """
     logging.info("tennet: Started getting the data")
     number_of_retries = 0
-    base_url = settings.BASE_URL+settings.TYPE+date_range+settings.SUBMIT_TYPE
     df = pd.DataFrame()
+    print(base_url)
     try:
         df_temp = pd.read_csv(base_url).reset_index(drop=True)
         df = pd.concat([df, df_temp], axis=1)
@@ -28,9 +34,9 @@ def parse_tennet_url(date_range):
     return df
 
 
-def get_date_range():
-    curr_day_of_week = datetime.today().weekday()
-    curr_date = datetime.now()
+def get_date_range(curr_date):
+    logging.info("tennet: Started creating the date range")
+    curr_day_of_week = curr_date.weekday()
     prev_date = (curr_date - timedelta(1)).strftime("%d-%m-%Y")
     # If the current day is monday, then we need to get the data for fri,sat and sun.
     if curr_day_of_week == 0:
@@ -53,6 +59,7 @@ def parse_df(raw_data):
     # Convert the raw dataframe to a formatted JSON with all the required fields
     df = raw_data.filter(items=settings.COLUMNS)
     df = df.rename(columns=settings.COLUMN_MAPPING)
+    df['processed_time'] = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
     formatted_json = df.to_json(orient="records")
     return formatted_json
 
@@ -74,8 +81,7 @@ def produce_msg_to_kafka(bootstrap_server, topic, message):
     producer = topic.get_producer(sync=True)
     records = json.loads(message)
     for record in records:
-        # print(json.dumps(record).encode())
         hash_object = hashlib.md5(json.dumps(record).encode()).hexdigest()
-        record = record.update({'uid': hash_object})
+        record.update({'uid': hash_object})
         producer.produce(json.dumps(record).encode())
     logging.info('tennet: Finished producing message to Kafka')
